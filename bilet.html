@@ -9,7 +9,11 @@ button{font:inherit;border:0;border-radius:12px;padding:12px;background:rgba(255
 .rot{display:none;text-align:center;opacity:.8;margin:6px 0}
 @media (orientation:portrait) and (max-width:700px){.rot{display:block}.tk td{font-size:8.5px!important;height:58px!important;padding:1px!important}.tk .side{width:34px!important}.tk .logo{font-size:12px!important}}
 .tk td{cursor:pointer;font-size:12px;height:62px;user-select:none}
-.banner{position:fixed;left:50%;top:30%;transform:translateX(-50%);background:#ffd45c;color:#3a2300;font-size:30px;font-weight:900;padding:18px 28px;border-radius:18px;z-index:9;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9;padding:16px}
+.banner{position:relative;background:#ffd45c;color:#3a2300;font-size:30px;font-weight:900;padding:26px 34px 22px;border-radius:18px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6);max-width:420px}
+.banner small{font-size:17px;font-weight:600}
+.banner .cl{position:absolute;top:6px;right:6px;width:36px;height:36px;margin:0;padding:0;border-radius:50%;background:rgba(0,0,0,.15);color:#3a2300;font-size:18px}
+.banner .ok{background:#3a2300;color:#ffd45c;font-weight:700;margin-top:14px}
 
 .tk{display:flex;background:#fff;border:2px solid #c9a227;border-radius:6px;overflow:hidden;color:#222;font-family:Arial,sans-serif;width:100%}
 .tk .side{width:62px;background:linear-gradient(#ffe9a8,#f4c542);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 2px;border-right:2px solid #c9a227}
@@ -79,15 +83,25 @@ function render(){
    + '<button onclick="resetM()">Снять все отметки</button>';
 }
 function rowsDone(){ let k = 0; T.c.forEach((c, ci) => c.forEach((r, ri) => { if (r.every((n, j) => !n || M[ci+'-'+ri+'-'+j])) k++; })); return k; }
-function cardDone(){ return T.c.some((c, ci) => c.every((r, ri) => r.every((n, j) => !n || M[ci+'-'+ri+'-'+j]))); }
+function cardsDone(){ return T.c.filter((c, ci) => c.every((r, ri) => r.every((n, j) => !n || M[ci+'-'+ri+'-'+j]))).length; }
 function mark(key){
-  const r0 = rowsDone(), c0 = cardDone();
+  const r0 = rowsDone(), c0 = cardsDone();
   M[key] = !M[key]; localStorage.setItem(KEY, JSON.stringify(M)); render();
   navigator.vibrate && navigator.vibrate(30);
-  if (cardDone() && !c0) banner('🎉 ЛОТО!<br><small>Карточка закрыта</small>');
-  else if (rowsDone() > r0) banner('⭐ Ряд закрыт!');
+  const c1 = cardsDone();
+  if (c1 > c0 && c1 === T.c.length) banner('🏆 ЛОТО!<br><small>Весь билет закрыт! Покажите билет ведущему</small>');
+  else if (c1 > c0) banner('🎉 Карточка закрыта!<br><small>Покажите билет ведущему</small>');
+  else if (rowsDone() > r0) banner('⭐ Строка закрыта!<br><small>Покажите билет ведущему</small>');
 }
 function resetM(){ if (confirm('Снять все отметки?')) { M = {}; localStorage.setItem(KEY, '{}'); render(); } }
-function banner(h){ const d = document.createElement('div'); d.className = 'banner'; d.innerHTML = h; document.body.appendChild(d); setTimeout(() => d.remove(), 2500); }
+function banner(h){
+  closeBanner();
+  const d = document.createElement('div'); d.className = 'ov'; d.id = 'ov';
+  d.innerHTML = '<div class="banner"><button class="cl" onclick="closeBanner()">✕</button>' + h + '<button class="ok" onclick="closeBanner()">Понятно</button></div>';
+  d.onclick = ev => { if (ev.target === d) closeBanner(); };
+  document.body.appendChild(d);
+  navigator.vibrate && navigator.vibrate([100, 60, 100]);
+}
+function closeBanner(){ const d = document.getElementById('ov'); if (d) d.remove(); }
 start();
 </script></body></html>

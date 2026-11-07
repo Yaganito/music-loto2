@@ -98,11 +98,21 @@ button{background:rgba(240,245,255,.06);border:1px solid rgba(0,220,255,.35);col
 .tag.bad{background:var(--pink);color:#fff}
 .lib .it{border-bottom-color:rgba(0,220,255,.12)}
 input[type=text],input[type=number]{background:var(--bg2);border-color:rgba(0,220,255,.35);color:var(--txt)}
+/* ---- уведомления ведущему ---- */
+#notes{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);width:calc(100% - 20px);max-width:540px;z-index:8;display:flex;flex-direction:column;gap:6px;max-height:45vh;overflow:auto}
+.note{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--cyan);border-radius:12px;padding:8px 10px;box-shadow:0 0 14px rgba(0,220,255,.45)}
+.note span{flex:1;font-size:15px}
+.note button{padding:6px 10px}
+.note.mid{border-color:var(--pink);box-shadow:0 0 14px rgba(255,45,180,.55)}
+.note.top{background:var(--pink);border-color:var(--pink);color:#fff;font-weight:700}
+#notes .noteall{background:var(--bg);padding:8px}
+@media print{#notes{display:none!important}}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div id="print"></div>
+<div id="notes"></div>
 <script>
 // ================= утилиты =================
 const $ = s => document.querySelector(s);
@@ -301,7 +311,7 @@ function newGame() {
   const tir = rnd(1000, 9999);
   G = { order, drawn: [], given: [], tir, leave: Math.min(SET.leave, N - 1),
         tickets: [...ids].map(id => ({ id, tir, c: makeTicket(N) })) };
-  saveG(); show('game');
+  saveG(); NOTES = []; drawNotes(); show('game');
 }
 
 // ================= ссылки и QR =================
@@ -455,11 +465,35 @@ function draw() {
   const iv = setInterval(() => b.textContent = rest[Math.floor(Math.random() * rest.length)], 70);
   setTimeout(() => {
     clearInterval(iv); rolling = false;
-    G.drawn.push(n); saveG(); render(); playN(n);
+    G.drawn.push(n); saveG(); render(); playN(n); checkWins(n);
     navigator.vibrate && navigator.vibrate(40);
   }, 1600);
 }
-function reset() { if (confirm('Сбросить выпавшие бочонки и начать игру заново? Билеты останутся те же.')) { stopA(); G.drawn = []; saveG(); render(); } }
+function reset() { if (confirm('Сбросить выпавшие бочонки и начать игру заново? Билеты останутся те же.')) { stopA(); G.drawn = []; saveG(); NOTES = []; drawNotes(); render(); } }
+
+// ================= уведомления: кто что закрыл =================
+let NOTES = [], noteSeq = 0;
+function checkWins(n) {
+  const d = new Set(G.drawn), full = r => r.every(x => !x || d.has(x));
+  G.tickets.forEach((t, i) => {
+    if (!t.c.flat(2).includes(n)) return;
+    let rows = 0, cards = 0;
+    t.c.forEach(c => {
+      c.forEach(r => { if (r.includes(n) && full(r)) rows++; });
+      if (c.flat().includes(n) && c.every(full)) cards++;
+    });
+    const all = t.c.every(c => c.every(full));
+    const txt = all ? 'закрыл ВЕСЬ БИЛЕТ 🏆' : cards ? 'закрыл карточку 🎉' : rows > 1 ? 'закрыл ' + rows + ' строки ⭐' : rows ? 'закрыл строку ⭐' : '';
+    if (txt) NOTES.push({ id: ++noteSeq, i, cls: all ? 'top' : cards ? 'mid' : '', h: 'Билет ' + (i + 1) + ' (№' + t.id + ') ' + txt });
+  });
+  drawNotes();
+}
+function drawNotes() {
+  const b = $('#notes'); if (!b) return;
+  b.innerHTML = NOTES.map(x => `<div class="note ${x.cls}"><span>${e(x.h)}</span><button onclick="check(${x.i})" title="Проверить">🔍</button><button onclick="closeNote(${x.id})">✕</button></div>`).join('')
+    + (NOTES.length > 1 ? '<button class="noteall" onclick="NOTES=[];drawNotes()">Закрыть все</button>' : '');
+}
+function closeNote(id) { NOTES = NOTES.filter(x => x.id !== id); drawNotes(); }
 
 // ================= старт =================
 render();
