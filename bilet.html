@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Билет — музыкальное лото</title>
+<style>
+body{margin:0;font-family:system-ui,Roboto,sans-serif;background:linear-gradient(160deg,#1b1033,#2d1b4e 60%,#14263f);background-attachment:fixed;color:#fff;min-height:100vh}
+#app{max-width:1000px;margin:0 auto;padding:10px}
+h1{text-align:center;font-size:22px;margin:6px 0}
+.sub{text-align:center;opacity:.75;margin:6px 0 10px;font-size:14px}
+button{font:inherit;border:0;border-radius:12px;padding:12px;background:rgba(255,255,255,.13);color:#fff;width:100%;margin-top:10px}
+.rot{display:none;text-align:center;opacity:.8;margin:6px 0}
+@media (orientation:portrait) and (max-width:700px){.rot{display:block}.tk td{font-size:8.5px!important;height:58px!important;padding:1px!important}.tk .side{width:34px!important}.tk .logo{font-size:12px!important}}
+.tk td{cursor:pointer;font-size:12px;height:62px;user-select:none}
+.banner{position:fixed;left:50%;top:30%;transform:translateX(-50%);background:#ffd45c;color:#3a2300;font-size:30px;font-weight:900;padding:18px 28px;border-radius:18px;z-index:9;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+
+.tk{display:flex;background:#fff;border:2px solid #c9a227;border-radius:6px;overflow:hidden;color:#222;font-family:Arial,sans-serif;width:100%}
+.tk .side{width:62px;background:linear-gradient(#ffe9a8,#f4c542);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 2px;border-right:2px solid #c9a227}
+.tk .logo{writing-mode:vertical-rl;transform:rotate(180deg);font-weight:900;font-size:17px;color:#b3122e;text-align:center;line-height:1.05;letter-spacing:.5px}
+.tk .meta{writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;color:#5a3a00;text-align:center}
+.tk .meta b{font-size:13px;color:#b3122e}
+.tk .cards{flex:1;display:flex;flex-direction:column}
+.tk .card{display:flex;flex:1}
+.tk .card+.card{border-top:3px solid #c9a227}
+.tk .lab{writing-mode:vertical-rl;transform:rotate(180deg);background:#c9a227;color:#fff;font-size:10px;font-weight:700;text-align:center;width:16px}
+.tk table{border-collapse:collapse;width:100%;table-layout:fixed}
+.tk td{border:1px solid #b9b9b9;height:46px;padding:2px 3px;font-size:10px;line-height:1.15;text-align:center;vertical-align:middle;word-break:break-word;overflow:hidden;position:relative}
+.tk td.e{background:#fff}
+.tk td .no{display:block;font-size:8px;color:#999}
+.tk td.x{background:#f3eef8;color:#999}
+.tk td.x::after{content:'';position:absolute;inset:0;background:linear-gradient(to top right,transparent calc(50% - 2px),#d42a4a calc(50% - 2px),#d42a4a calc(50% + 2px),transparent calc(50% + 2px))}
+.tk td.pl{background:#cdf3dc}
+.tk .qr{width:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-left:2px solid #c9a227;padding:4px;font-size:9px;color:#666;text-align:center}
+.tk .qr img{width:108px;height:108px;image-rendering:pixelated}
+
+</style></head><body><div id="app"></div>
+<script>
+
+function ticketHtml(t, title, names, opts){
+  opts = opts || {};
+  const e = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let h = '<div class="tk"><div class="side"><div class="logo">'+e(title)+'</div><div class="meta">Билет № <b>'+t.id+'</b><br>Тираж '+t.tir+'</div></div><div class="cards">';
+  t.c.forEach((card, ci) => {
+    h += '<div class="card"><div class="lab">карточка '+(ci+1)+'</div><table>';
+    card.forEach((row, ri) => {
+      h += '<tr>';
+      row.forEach((n, k) => {
+        if (!n) { h += '<td class="e"></td>'; return; }
+        const key = ci+'-'+ri+'-'+k;
+        let cls = '';
+        if (opts.marks && opts.marks[key]) cls = 'x';
+        if (opts.played && opts.played.has(n)) cls = 'pl';
+        h += '<td class="'+cls+'"'+(opts.click ? ' onclick="mark(\''+key+'\')"' : '')+'>'+e(names(n))+(opts.nums ? '<span class="no">№'+n+'</span>' : '')+'</td>';
+      });
+      h += '</tr>';
+    });
+    h += '</table></div>';
+  });
+  h += '</div>' + (opts.qr ? '<div class="qr"><img src="'+opts.qr+'"><div>Билет на телефоне</div></div>' : '') + '</div>';
+  return h;
+}
+
+const app = document.getElementById('app');
+let T, M, KEY;
+async function start(){
+  try {
+    let s = location.hash.replace(/^#t=/, '').replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    const bin = Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const txt = await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
+    T = JSON.parse(txt);
+  } catch (err) { app.innerHTML = '<h1>Билет не открылся</h1><div class="sub">Отсканируйте QR-код ещё раз. Если не помогает, обновите браузер (Chrome или Safari).</div>'; return; }
+  KEY = 'ml2_marks_' + T.id; M = JSON.parse(localStorage.getItem(KEY) || '{}');
+  render();
+}
+const names = n => T.s[n] || '';
+function render(){
+  const cnt = Object.values(M).filter(Boolean).length;
+  app.innerHTML = '<h1>🎵 ' + T.title + '</h1><div class="rot">↻ Поверните телефон горизонтально, так удобнее</div>'
+   + ticketHtml(T, T.title, names, {marks: M, click: true})
+   + '<div class="sub">Узнали песню и она есть в билете? Нажмите на неё. Зачёркнуто: ' + cnt + '</div>'
+   + '<button onclick="resetM()">Снять все отметки</button>';
+}
+function rowsDone(){ let k = 0; T.c.forEach((c, ci) => c.forEach((r, ri) => { if (r.every((n, j) => !n || M[ci+'-'+ri+'-'+j])) k++; })); return k; }
+function cardDone(){ return T.c.some((c, ci) => c.every((r, ri) => r.every((n, j) => !n || M[ci+'-'+ri+'-'+j]))); }
+function mark(key){
+  const r0 = rowsDone(), c0 = cardDone();
+  M[key] = !M[key]; localStorage.setItem(KEY, JSON.stringify(M)); render();
+  navigator.vibrate && navigator.vibrate(30);
+  if (cardDone() && !c0) banner('🎉 ЛОТО!<br><small>Карточка закрыта</small>');
+  else if (rowsDone() > r0) banner('⭐ Ряд закрыт!');
+}
+function resetM(){ if (confirm('Снять все отметки?')) { M = {}; localStorage.setItem(KEY, '{}'); render(); } }
+function banner(h){ const d = document.createElement('div'); d.className = 'banner'; d.innerHTML = h; document.body.appendChild(d); setTimeout(() => d.remove(), 2500); }
+start();
+</script></body></html>
